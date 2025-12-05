@@ -5,7 +5,7 @@ import { useTheme } from "../context/theme";
 import { Moon, Sun } from "lucide-react";
 
 // 🔥 IMPORTAÇÃO DA IMAGEM
-import adaImage from "../assets/ada.jpg";
+import adaImage from "../assets/adaa.jpg";
 
 export default function Login() {
   const [email, setEmail] = useState("admin@gdash.com");
