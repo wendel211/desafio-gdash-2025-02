@@ -1,0 +1,79 @@
+
+# .gitignore para a pasta worker
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# IDEs / editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.iml
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnp.*
+.lock-wscript
+.cache/
+.next/
+dist/
+build/
+out/
+.vite/
+parcel-cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.python-version
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Arquivos de ambiente / segredos
+.env
+.env.local
+.env.*.local
+*.secret
+
+# Logs / runtime
+*.log
+logs/
+*.pid
+*.seed
+*.tmp
+
+# Cobertura / relatórios
+coverage/
+htmlcov/
+
+# Bancos de dados locais
+*.sqlite3
+*.db
+
+# Docker / contêineres
+docker-compose.override.yml
+
+# Arquivos gerados / temporários
+*.class
+*.o
+*.so
+*.exe
+*.dll
+*.out
+
+# Ferramentas específicas
+.idea/
