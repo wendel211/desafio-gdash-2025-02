@@ -1,0 +1,117 @@
+version: "3.9"
+
+services:
+  api:
+    container_name: nest-api
+    build: ./api
+    restart: always
+    ports:
+      - "${API_PORT}:3000"
+    environment:
+      PORT: 3000
+      MONGO_URI: ${MONGO_URI}
+      JWT_SECRET: ${API_JWT_SECRET}
+      DEFAULT_ADMIN_EMAIL: ${API_DEFAULT_ADMIN_EMAIL}
+      DEFAULT_ADMIN_PASSWORD: ${API_DEFAULT_ADMIN_PASSWORD}
+      AI_URL: "http://ai-service:8001"
+    depends_on:
+      - mongo
+      - rabbitmq
+    networks:
+      - weather_net
+
+  ai-service:
+    container_name: ai-service
+    build: ./ai-service
+    restart: always
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NEST_API_URL: "http://api:3000"
+    ports:
+      - "8001:8001"
+    depends_on:
+      - api
+    networks:
+      - weather_net
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    restart: always
+    ports:
+      - "3001:80"
+    networks:
+      - weather_net
+
+  collector:
+    container_name: python-collector
+    build: ./collector
+    restart: always
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      QUEUE_NAME: ${QUEUE_NAME}
+      WEATHER_API_URL: ${WEATHER_API_URL}
+      CITY_LAT: ${CITY_LAT}
+      CITY_LON: ${CITY_LON}
+      COLLECTOR_INTERVAL: ${COLLECTOR_INTERVAL}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - weather_net
+
+  worker:
+    container_name: worker-go
+    build: ./worker
+    restart: always
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      API_URL: ${API_URL}
+      QUEUE_NAME: ${QUEUE_NAME}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      api:
+        condition: service_started
+    networks:
+      - weather_net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks:
+      - weather_net
+
+  mongo:
+    image: mongo
+    container_name: mongo
+    restart: always
+    networks:
+      - weather_net
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
+  rabbitmq_data:
+
+networks:
+  weather_net:
