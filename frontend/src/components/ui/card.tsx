@@ -13,3 +13,11 @@ export function CardTitle({ children }: any) {
 export function CardContent({ children }: any) {
   return <div className="p-4">{children}</div>;
 }
+
+export function CardFooter({ children }: any) {
+  return <div className="p-4 border-t">{children}</div>;
+}
+
+export function CardDescription({ children }: any) {
+  return <p className="text-sm text-gray-500">{children}</p>;
+}

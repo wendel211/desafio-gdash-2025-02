@@ -1,38 +1,49 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api } from "../api/axios";
 import { Loading } from "../components/ui/loading";
 import { useToast } from "../components/ui/toast";
 import {
-  RefreshCw,
+
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Area,
+  ComposedChart,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import {
+  Download,
   TrendingUp,
-  AlertTriangle,
-  Info,
-  ThermometerSun,
-  Wind,
+  Activity,
   Droplets,
-  CloudSun
+  Wind,
+  Filter,
+  RefreshCw,
+  Info,
+  AlertTriangle,
+  ThermometerSun,
 } from "lucide-react";
 
 import {
   Card,
   CardHeader,
   CardTitle,
+  CardDescription,
   CardContent,
 } from "../components/ui/card";
 
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-} from "recharts";
-
 import { Button } from "../components/ui/button";
 
-// ITEM DE INSIGHT
+
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
+
 const InsightItem = ({ icon: Icon, text, colorClass }: any) => (
   <li className={`flex items-start gap-2 text-sm ${colorClass}`}>
     <Icon className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
@@ -40,26 +51,50 @@ const InsightItem = ({ icon: Icon, text, colorClass }: any) => (
   </li>
 );
 
-export default function Dashboard() {
+function KpiCard({ title, value, icon: Icon, trend, color }: any) {
+  return (
+    <Card className="border shadow-sm overflow-hidden">
+      <CardContent className="p-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{title}</p>
+            <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">{value}</h3>
+          </div>
+          <div className={`p-3 rounded-xl ${color}`}>
+            <Icon size={22} />
+          </div>
+        </div>
+        <p className="mt-4 text-xs text-slate-400 flex items-center gap-1">
+          <TrendingUp size={12} className="text-emerald-500" /> {trend}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function AnalyticsDashboard() {
+
   const [logs, setLogs] = useState<any[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<any[]>([]);
   const [insights, setInsights] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshingInsights, setRefreshingInsights] = useState(false);
-
   const { showToast } = useToast();
 
+  // === ESTADOS DE FILTRO ===
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [condition, setCondition] = useState("all");
   const [tempMin, setTempMin] = useState(0);
   const [tempMax, setTempMax] = useState(60);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // === LÓGICA ORIGINAL PRESERVADA ===
+  // === CARREGAMENTO INICIAL ===
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
+        // Chamadas reais para sua API
         const logsRes = await api.get("/weather/logs");
         const insightsRes = await api.get("/weather/insights");
 
@@ -68,13 +103,15 @@ export default function Dashboard() {
         setInsights(insightsRes.data);
       } catch (err) {
         showToast("Erro ao carregar dados do dashboard", "error");
+        console.error(err);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
+  }, [showToast]);
 
+  // === AÇÕES ===
   async function refreshInsights() {
     try {
       setRefreshingInsights(true);
@@ -113,11 +150,8 @@ export default function Dashboard() {
     try {
       const response = await api.get("/weather/export.csv", {
         responseType: "blob",
-        headers: {
-          Accept: "text/csv",
-        },
+        headers: { Accept: "text/csv" },
       });
-
       const blob = new Blob([response.data], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -126,7 +160,6 @@ export default function Dashboard() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-
       showToast("CSV exportado com sucesso!", "success");
     } catch (err) {
       showToast("Erro ao exportar CSV", "error");
@@ -137,15 +170,9 @@ export default function Dashboard() {
     try {
       const response = await api.get("/weather/export.xlsx", {
         responseType: "blob",
-        headers: {
-          Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
+        headers: { Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
       });
-
-      const blob = new Blob([response.data], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-
+      const blob = new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -153,366 +180,362 @@ export default function Dashboard() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-
       showToast("XLSX exportado com sucesso!", "success");
     } catch (err) {
       showToast("Erro ao exportar XLSX", "error");
     }
   }
 
+  const processedData = useMemo(() => {
+    if (!filteredLogs.length) return { timeline: [], conditions: [], stats: {} };
+
+
+    const temps = filteredLogs.map(l => l.temperature);
+    const maxTemp = Math.max(...temps).toFixed(1);
+    const minTemp = Math.min(...temps).toFixed(1);
+    const avgTemp = (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1);
+    
+    const hums = filteredLogs.map(l => l.humidity);
+    const avgHum = (hums.reduce((a, b) => a + b, 0) / hums.length).toFixed(0);
+
+    const winds = filteredLogs.map(l => l.wind_speed);
+    const maxWind = Math.max(...winds).toFixed(1);
+
+    // 2. Distribuição de Condições
+    const conditionCounts: Record<string, number> = {};
+    filteredLogs.forEach(l => {
+        const cond = l.condition || "Desconhecido";
+        conditionCounts[cond] = (conditionCounts[cond] || 0) + 1;
+    });
+    const conditionData = Object.keys(conditionCounts).map(key => ({
+        name: key,
+        value: conditionCounts[key]
+    }));
+
+    // 3. Timeline
+    // Reverter array se vier do mais novo para o mais antigo, para o gráfico ler da esquerda p/ direita
+    // Verifique se sua API retorna ASC ou DESC e ajuste o .reverse() se necessário
+    const timelineData = [...filteredLogs].reverse().map(log => ({
+        timestamp: log.timestamp,
+        time: new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        fullDate: new Date(log.timestamp).toLocaleDateString(),
+        temperature: log.temperature,
+        humidity: log.humidity,
+        wind: log.wind_speed,
+        condition: log.condition 
+    }));
+
+    return {
+        stats: { maxTemp, minTemp, avgTemp, avgHum, maxWind },
+        conditions: conditionData,
+        timeline: timelineData
+    };
+  }, [filteredLogs]);
+
   if (loading) return <Loading />;
 
-  const latest = filteredLogs[0];
-
-  // =============================================
-  //  NOVO LAYOUT (LÓGICA 100% MANTIDA)
-  // =============================================
-
   return (
-    <div className="space-y-8 pb-10">
-
-      {/* TÍTULO + EXPORTAÇÕES */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          Dashboard Climático
-        </h1>
-
-        <div className="flex gap-2">
-          <Button variant="outline" className="h-8 px-3 text-xs" onClick={downloadCSV}>
-            CSV
-          </Button>
-          <Button variant="outline" className="h-8 px-3 text-xs" onClick={downloadXLSX}>
-            XLSX
-          </Button>
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 p-4 md:p-6 space-y-6">
+      
+      {/* HEADER + BOTÕES */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <Activity className="text-blue-600" /> Dashboard Climático
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            Análise de dados em tempo real
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+           <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
+             <Filter className="mr-2 h-4 w-4" /> Filtros
+           </Button>
+           <Button variant="outline" size="sm" onClick={downloadCSV}>
+             <Download className="mr-2 h-4 w-4" /> CSV
+           </Button>
+           <Button variant="default" size="sm" onClick={downloadXLSX}>
+             <Download className="mr-2 h-4 w-4" /> XLSX
+           </Button>
         </div>
       </div>
 
-      {/* ⭐ WEATHER CARD PRINCIPAL (COM TODOS OS DADOS REAIS) */}
-      <Card className="rounded-2xl shadow-lg border border-blue-100 bg-blue-50 dark:bg-slate-900 dark:border-slate-800 p-6">
-        <div className="flex items-center justify-between">
-
-          <div>
-            <h2 className="text-xl font-semibold text-blue-700 dark:text-blue-300">
-              Clima Atual
-            </h2>
-
-            <p className="text-6xl font-bold text-blue-600 dark:text-blue-400 mt-2">
-              {latest?.temperature ?? "--"}°C
-            </p>
-
-            <p className="text-lg text-slate-700 dark:text-slate-300 mt-1 capitalize">
-              {latest?.condition ?? "--"}
-            </p>
-
-            <div className="mt-4 space-y-1 text-sm text-slate-700 dark:text-slate-300">
-              <p>Umidade: {latest?.humidity ?? "--"}%</p>
-              <p>Vento: {latest?.wind_speed ?? "--"} km/h</p>
-            </div>
-          </div>
-
-          <CloudSun size={110} className="text-blue-400 dark:text-blue-500 opacity-80" />
-        </div>
-      </Card>
-
-      {/* ⭐ MINI INDICADORES (IGUAL MOCKUP) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        <Card className="rounded-xl shadow border bg-white dark:bg-slate-900 dark:border-slate-800">
-          <CardHeader className="flex flex-row justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-              Temperatura
-            </CardTitle>
-            <ThermometerSun className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold text-blue-600 dark:text-blue-400">
-              {latest?.temperature ?? "--"}°C
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl shadow border bg-white dark:bg-slate-900 dark:border-slate-800">
-          <CardHeader className="flex flex-row justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-              Umidade
-            </CardTitle>
-            <Droplets className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold text-blue-600 dark:text-blue-400">
-              {latest?.humidity ?? "--"}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl shadow border bg-white dark:bg-slate-900 dark:border-slate-800">
-          <CardHeader className="flex flex-row justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-              Vento
-            </CardTitle>
-            <Wind className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold text-blue-600 dark:text-blue-400">
-              {latest?.wind_speed ?? "--"} km/h
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl shadow border bg-white dark:bg-slate-900 dark:border-slate-800">
-          <CardHeader className="flex flex-row justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-              Condição
-            </CardTitle>
-            <CloudSun className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-xl font-semibold text-blue-600 dark:text-blue-400 capitalize">
-              {latest?.condition ?? "--"}
-            </p>
-          </CardContent>
-        </Card>
-
-      </div>
-
-      {/* ⭐ INSIGHTS REORGANIZADOS EM 2 COLUNAS */}
-      {insights && (
-        <Card className="rounded-2xl shadow border bg-white dark:bg-slate-900 dark:border-slate-800 p-6">
-          <h2 className="text-xl font-semibold mb-6 text-slate-800 dark:text-slate-200">
-            Insights Inteligentes
-          </h2>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-
-            {/* COLUNA 1 */}
-            <div className="space-y-4">
-
-              {insights.resumo && (
-                <div className="bg-blue-50 dark:bg-slate-800 p-4 rounded-xl border border-blue-100 dark:border-slate-700">
-                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-semibold">
-                    <Info size={18} />
-                    Resumo
-                  </div>
-                  <p className="text-slate-700 dark:text-slate-300 mt-2">
-                    {insights.resumo}
-                  </p>
+      {/* ÁREA DE FILTROS (COLLAPSIBLE) */}
+      {(showFilters || window.innerWidth > 768) && (
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+            <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-500 uppercase">Início</label>
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full text-sm p-2 border rounded-md dark:bg-slate-950 dark:border-slate-700" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-500 uppercase">Fim</label>
+                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full text-sm p-2 border rounded-md dark:bg-slate-950 dark:border-slate-700" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-500 uppercase">Condição</label>
+                        <select value={condition} onChange={e => setCondition(e.target.value)} className="w-full text-sm p-2 border rounded-md dark:bg-slate-950 dark:border-slate-700">
+                            <option value="all">Todas</option>
+                            <option value="Clear">Ensolarado</option>
+                            <option value="Cloudy">Nublado</option>
+                            <option value="Rain">Chuva</option>
+                            <option value="Wind">Vento</option>
+                        </select>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-500 uppercase">Temp Min/Max</label>
+                        <div className="flex gap-2">
+                            <input type="number" placeholder="0" value={tempMin} onChange={e => setTempMin(Number(e.target.value))} className="w-full text-sm p-2 border rounded-md dark:bg-slate-950 dark:border-slate-700" />
+                            <input type="number" placeholder="60" value={tempMax} onChange={e => setTempMax(Number(e.target.value))} className="w-full text-sm p-2 border rounded-md dark:bg-slate-950 dark:border-slate-700" />
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button onClick={applyFilters} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">Aplicar</Button>
+                        <Button onClick={resetFilters} variant="outline" className="px-3"><RefreshCw size={14}/></Button>
+                    </div>
                 </div>
-              )}
-
-              {insights.tendencias?.length > 0 && (
-                <div>
-                  <h3 className="uppercase text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
-                    Tendências
-                  </h3>
-                  <ul className="space-y-2">
-                    {insights.tendencias.map((t: string, idx: number) => (
-                      <InsightItem
-                        key={idx}
-                        icon={TrendingUp}
-                        text={t}
-                        colorClass="text-slate-700 dark:text-slate-300"
-                      />
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-            </div>
-
-            {/* COLUNA 2 */}
-            <div className="space-y-4">
-
-              {insights.alertas?.length > 0 && (
-                <div>
-                  <h3 className="uppercase text-xs font-semibold text-red-500/90 mb-2">
-                    Atenção Necessária
-                  </h3>
-                  <ul className="space-y-2">
-                    {insights.alertas.map((a: string, idx: number) => (
-                      <InsightItem
-                        key={idx}
-                        icon={AlertTriangle}
-                        text={a}
-                        colorClass="text-red-600 dark:text-red-400 font-medium"
-                      />
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <Button
-                onClick={refreshInsights}
-                disabled={refreshingInsights}
-                className="rounded-xl mt-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-800 dark:hover:bg-blue-600 text-white shadow-md"
-              >
-                <RefreshCw
-                  size={16}
-                  className={`mr-2 ${refreshingInsights ? "animate-spin" : ""}`}
-                />
-                {refreshingInsights ? "Analisando..." : "Atualizar IA"}
-              </Button>
-
-            </div>
-          </div>
+            </CardContent>
         </Card>
       )}
 
-      {/* ⭐ FILTROS EM CARD REORGANIZADO */}
-      <Card className="rounded-2xl shadow border bg-white dark:bg-slate-900 dark:border-slate-800 p-6">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold">Filtros de Dados</CardTitle>
-        </CardHeader>
+      {/* KPI CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard 
+            title="Temp. Média" 
+            value={`${processedData.stats.avgTemp || 0}°C`} 
+            icon={ThermometerSun} 
+            trend="Período selecionado"
+            color="text-blue-600 bg-blue-50 dark:bg-blue-900/20"
+        />
+        <KpiCard 
+            title="Pico Máximo" 
+            value={`${processedData.stats.maxTemp || 0}°C`} 
+            icon={TrendingUp} 
+            trend="Máxima registrada"
+            color="text-red-600 bg-red-50 dark:bg-red-900/20"
+        />
+        <KpiCard 
+            title="Umidade Média" 
+            value={`${processedData.stats.avgHum || 0}%`} 
+            icon={Droplets} 
+            trend="Média do período"
+            color="text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20"
+        />
+        <KpiCard 
+            title="Vento Máximo" 
+            value={`${processedData.stats.maxWind || 0} km/h`} 
+            icon={Wind} 
+            trend="Rajada mais forte"
+            color="text-slate-600 bg-slate-50 dark:bg-slate-800"
+        />
+      </div>
 
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* LINHA DE GRÁFICOS 1 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* GRÁFICO TEMPORAL */}
+        <Card className="lg:col-span-2 shadow-sm">
+            <CardHeader>
+                <CardTitle>Análise Temporal</CardTitle>
+                <CardDescription>
+                  Cruzamento de Temperatura (Linha) e Umidade (Barra)
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="h-[350px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={processedData.timeline} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                            <defs>
+                                <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.4} />
+                            <XAxis 
+                                dataKey="time" 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tick={{fontSize: 11, fill: '#64748b'}} 
+                                minTickGap={30}
+                            />
+                            <YAxis 
+                                yAxisId="left" 
+                                orientation="left" 
+                                stroke="#2563eb" 
+                                tickLine={false} 
+                                axisLine={false}
+                                unit="°C"
+                                width={40}
+                            />
+                            <YAxis 
+                                yAxisId="right" 
+                                orientation="right" 
+                                stroke="#00C49F" 
+                                tickLine={false} 
+                                axisLine={false}
+                                unit="%"
+                                width={40}
+                            />
+                            <Tooltip 
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                labelStyle={{ color: '#64748b', marginBottom: '4px' }}
+                            />
+                            <Legend verticalAlign="top" height={36}/>
+                            <Bar yAxisId="right" dataKey="humidity" name="Umidade (%)" fill="#00C49F" opacity={0.3} radius={[4, 4, 0, 0]} barSize={20} />
+                            <Area yAxisId="left" type="monotone" dataKey="temperature" name="Temp (°C)" stroke="#2563eb" fillOpacity={1} fill="url(#colorTemp)" strokeWidth={2} />
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                </div>
+            </CardContent>
+        </Card>
 
-            {/* Datas */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                Período
-              </label>
+        {/* INSIGHTS CARD */}
+        <Card className="shadow-sm flex flex-col">
+            <CardHeader className="pb-2">
+                <div className="flex justify-between items-center">
+                    <CardTitle className="flex items-center gap-2">
+                        <Info size={18} className="text-purple-500" />
+                        Insights AI
+                    </CardTitle>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={refreshInsights} 
+                        disabled={refreshingInsights}
+                        className={refreshingInsights ? "animate-spin text-purple-600" : "text-slate-400 hover:text-purple-600"}
+                    >
+                        <RefreshCw size={16} />
+                    </Button>
+                </div>
+                <CardDescription>Análise inteligente dos dados</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto max-h-[350px] space-y-4">
+                {insights ? (
+                    <>
+                        <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-lg border border-purple-100 dark:border-purple-900/20">
+                            <p className="text-sm text-slate-700 dark:text-slate-300 italic">
+                                "{insights.resumo}"
+                            </p>
+                        </div>
+                        
+                        {insights.tendencias?.length > 0 && (
+                            <div>
+                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                                    <TrendingUp size={12}/> Tendências
+                                </h4>
+                                <ul className="space-y-2">
+                                    {insights.tendencias.map((t: string, idx: number) => (
+                                        <InsightItem key={idx} icon={TrendingUp} text={t} colorClass="text-slate-600 dark:text-slate-400" />
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
 
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  className="w-full rounded-xl border px-2 py-1 text-sm bg-white dark:bg-slate-950 dark:border-slate-700"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
+                        {insights.alertas?.length > 0 && (
+                            <div>
+                                <h4 className="text-xs font-bold text-red-500 uppercase mb-2 flex items-center gap-1">
+                                    <AlertTriangle size={12}/> Alertas
+                                </h4>
+                                <ul className="space-y-2">
+                                    {insights.alertas.map((a: string, idx: number) => (
+                                        <InsightItem key={idx} icon={AlertTriangle} text={a} colorClass="text-red-600 dark:text-red-400 font-medium" />
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                        <Info size={32} className="mb-2 opacity-20"/>
+                        <p className="text-xs">Nenhum insight disponível</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+      </div>
 
-                <input
-                  type="date"
-                  className="w-full rounded-xl border px-2 py-1 text-sm bg-white dark:bg-slate-950 dark:border-slate-700"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-            </div>
+      {/* LINHA DE GRÁFICOS 2 (PIZZA + TABELA) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+           
+           {/* GRÁFICO PIZZA */}
+           <Card>
+                <CardHeader>
+                    <CardTitle>Condições</CardTitle>
+                </CardHeader>
+                <CardContent className="flex justify-center">
+                    <div className="h-[200px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={processedData.conditions}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={50}
+                                    outerRadius={70}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {processedData.conditions.map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend layout="vertical" verticalAlign="middle" align="right" />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </CardContent>
+           </Card>
 
-            {/* Condição */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                Condição
-              </label>
-
-              <select
-                className="w-full rounded-xl border px-2 py-2 text-sm bg-white dark:bg-slate-950 dark:border-slate-700"
-                value={condition}
-                onChange={(e) => setCondition(e.target.value)}
-              >
-                <option value="all">Todas</option>
-                <option value="Clear">Ensolarado</option>
-                <option value="Cloudy">Nublado</option>
-                <option value="Rain">Chuva</option>
-                <option value="Wind">Vento</option>
-              </select>
-            </div>
-
-            {/* Temp */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                Temp. (Min-Máx)
-              </label>
-
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  className="w-full rounded-xl border px-2 py-1 text-sm dark:bg-slate-950 dark:border-slate-700"
-                  value={tempMin}
-                  onChange={(e) => setTempMin(Number(e.target.value))}
-                />
-
-                <input
-                  type="number"
-                  className="w-full rounded-xl border px-2 py-1 text-sm dark:bg-slate-950 dark:border-slate-700"
-                  value={tempMax}
-                  onChange={(e) => setTempMax(Number(e.target.value))}
-                />
-              </div>
-            </div>
-
-            {/* Botões */}
-            <div className="flex items-end gap-2">
-              <Button className="flex-1 rounded-xl" onClick={applyFilters}>
-                Aplicar
-              </Button>
-              <Button variant="outline" className="rounded-xl" onClick={resetFilters}>
-                Limpar
-              </Button>
-            </div>
-
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ⭐ GRÁFICO */}
-      <Card className="rounded-2xl shadow border bg-white dark:bg-slate-900 dark:border-slate-800 p-6">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Histórico de Temperatura</CardTitle>
-        </CardHeader>
-
-        <CardContent>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={filteredLogs}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
-                <XAxis dataKey="timestamp" hide />
-                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="temperature"
-                  stroke="#2563eb"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ⭐ TABELA */}
-      <Card className="rounded-2xl shadow border bg-white dark:bg-slate-900 dark:border-slate-800 p-6">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Registros Detalhados</CardTitle>
-        </CardHeader>
-
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-slate-400">
-                <tr>
-                  <th className="p-3 font-medium text-left">Data</th>
-                  <th className="p-3 font-medium text-left">Temp</th>
-                  <th className="p-3 font-medium text-left">Umidade</th>
-                  <th className="p-3 font-medium text-left">Vento</th>
-                  <th className="p-3 font-medium text-left">Condição</th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-blue-100 dark:divide-slate-800">
-                {filteredLogs.slice(0, 10).map((log: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-blue-50/50 dark:hover:bg-slate-800/50">
-                    <td className="p-3">{new Date(log.timestamp).toLocaleString()}</td>
-                    <td className="p-3">{log.temperature}°C</td>
-                    <td className="p-3">{log.humidity}%</td>
-                    <td className="p-3">{log.wind_speed} km/h</td>
-                    <td className="p-3 capitalize">{log.condition}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredLogs.length > 10 && (
-            <p className="mt-4 text-center text-xs text-slate-400">
-              Mostrando os últimos 10 registros de {filteredLogs.length}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
+           {/* TABELA DE REGISTROS */}
+           <Card className="md:col-span-2">
+                <CardHeader>
+                    <CardTitle>Últimos Registros</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500">
+                                <tr>
+                                    <th className="p-3 text-left font-medium">Horário</th>
+                                    <th className="p-3 text-left font-medium">Temp</th>
+                                    <th className="p-3 text-left font-medium">Umid</th>
+                                    <th className="p-3 text-left font-medium">Vento</th>
+                                    <th className="p-3 text-left font-medium">Condição</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {filteredLogs.slice(0, 5).map((log: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                        <td className="p-3 text-slate-600 dark:text-slate-300">
+                                            {new Date(log.timestamp).toLocaleTimeString()} <span className="text-xs text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</span>
+                                        </td>
+                                        <td className="p-3 font-medium">{log.temperature}°C</td>
+                                        <td className="p-3">{log.humidity}%</td>
+                                        <td className="p-3">{log.wind_speed} km/h</td>
+                                        <td className="p-3">
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 capitalize">
+                                                {log.condition}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {filteredLogs.length > 5 && (
+                        <div className="mt-4 text-center">
+                            <Button variant="ghost" size="sm" className="text-xs text-slate-500">
+                                Ver todos os {filteredLogs.length} registros
+                            </Button>
+                        </div>
+                    )}
+                </CardContent>
+           </Card>
+      </div>
     </div>
   );
 }
