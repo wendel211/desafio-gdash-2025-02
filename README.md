@@ -4,6 +4,8 @@
 
 Este projeto é um ecossistema completo de monitoramento climático desenvolvido para o desafio GDASH, integrando Backend NestJS, Dashboard React, Coletor Python, Worker Go, Serviço de IA com OpenAI, Mensageria RabbitMQ e Banco MongoDB, todos orquestrados via Docker Compose.
 
+Link do Youtube: [Vídeo](https://youtu.be/szXethsQtHI)
+
 ---
 
 ## Arquitetura Geral
@@ -43,6 +45,88 @@ Este projeto é um ecossistema completo de monitoramento climático desenvolvido
 | **Collector** | Python 3.11, Requests |
 | **Worker** | Go 1.21, AMQP |
 | **Infraestrutura** | Docker, Docker Compose |
+
+---
+
+## Testes Unitários
+
+O projeto conta com **44 testes unitários** cobrindo os principais serviços:
+
+### Cobertura de Testes
+
+| Serviço | Testes | Status | Coverage |
+|---------|--------|--------|----------|
+| **API NestJS** | 27 | 27/27 | 100% |
+| **Collector Python** | 11 | 11/11 | 100% |
+| **Worker Go** | 6 | 6/6 | 100% |
+| **TOTAL** | **44** | **44/44** | **100%** |
+
+### Executar Testes
+
+#### API NestJS
+```bash
+cd api
+npm test
+
+# Com coverage detalhado
+npm run test:cov
+
+# Modo watch (desenvolvimento)
+npm run test:watch
+```
+
+**Módulos Testados:**
+-  AuthService (Login, Validação, JWT)
+-  UsersService (CRUD, Hash de senha)
+-  WeatherService (Coleta, Filtros, Exportação)
+-  InsightsService (Análise de tendências, Alertas)
+
+#### Collector Python
+```bash
+cd collector
+python -m pytest -v
+
+# Com coverage
+python -m pytest --cov=. --cov-report=html
+
+# Teste específico
+python -m pytest test_weather_service.py -v
+```
+
+**Módulos Testados:**
+-  WeatherService (Coleta de dados, Mapeamento de códigos)
+-  QueueService (Conexão RabbitMQ, Envio de mensagens)
+
+#### Worker Go
+```bash
+cd worker
+go test -v
+
+# Com coverage
+go test -cover
+
+# Coverage detalhado
+go test -coverprofile=coverage.out
+go tool cover -html=coverage.out
+```
+
+**Módulos Testados:**
+-  WeatherData (Serialização, Deserialização)
+-  API Integration (Envio de dados, Validação)
+
+### Rodar Todos os Testes de Uma Vez
+
+**Windows (PowerShell):**
+```powershell
+# Criar arquivo run-all-tests.ps1 na raiz
+.\run-all-tests.ps1
+```
+
+**Linux/Mac:**
+```bash
+chmod +x run-all-tests.sh
+./run-all-tests.sh
+```
 
 ---
 
@@ -245,19 +329,20 @@ curl -X POST http://localhost:8001/generate-insights
 
 | Funcionalidade | Status |
 |----------------|--------|
-| API REST funcional | Concluído |
-| Dashboard completo | Concluído |
-| Coletor Python | Concluído |
-| Worker Go | Concluído |
-| Docker Compose | Concluído |
-| Autenticação JWT | Concluído |
-| CRUD de Usuários | Concluído |
-| Filtros Avançados | Concluído |
-| Tema Dark/Light | Concluído |
-| Insights de IA (OpenAI) | Concluído |
-| Exportação CSV/XLSX | Concluído |
-| Integração API pública | Concluído |
-| Bônus: Explore API | Concluído |
+| API REST funcional | ✅ Concluído |
+| Dashboard completo | ✅ Concluído |
+| Coletor Python | ✅ Concluído |
+| Worker Go | ✅ Concluído |
+| Docker Compose | ✅ Concluído |
+| Autenticação JWT | ✅ Concluído |
+| CRUD de Usuários | ✅ Concluído |
+| Filtros Avançados | ✅ Concluído |
+| Tema Dark/Light | ✅ Concluído |
+| Insights de IA (OpenAI) | ✅ Concluído |
+| Exportação CSV/XLSX | ✅ Concluído |
+| Integração API pública | ✅ Concluído |
+| Bônus: Explore API | ✅ Concluído |
+| **Testes Unitários** | ✅ **44/44 (100%)** |
 
 ---
 
@@ -314,4 +399,3 @@ docker logs worker-go -f
 Este projeto foi desenvolvido para o processo seletivo **GDASH 2025/02**.
 
 ---
-

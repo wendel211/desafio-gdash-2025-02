@@ -10,7 +10,7 @@ app = FastAPI()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 NEST_API_URL = os.getenv("NEST_API_URL", "http://api:3000")
 
-# Modelo de dados de entrada
+
 class WeatherLog(BaseModel):
     temperature: float
     humidity: float
@@ -40,7 +40,7 @@ async def generate_insights():
         }
     
     try:
-        # 1️⃣ BUSCAR DADOS DA API NESTJS
+
         print("📡 Buscando dados climáticos da API...")
         
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -64,7 +64,7 @@ async def generate_insights():
                 "classificacao": "Sem dados"
             }
         
-        # 2️⃣ PREPARAR DADOS PARA A IA (últimos 20 registros)
+      
         recent_logs = logs[:20] if len(logs) > 20 else logs
         
         # Calcular estatísticas básicas
@@ -79,7 +79,7 @@ async def generate_insights():
         min_temp = min(temps)
         max_temp = max(temps)
         
-        # 3️⃣ CONSTRUIR O PROMPT ESTRUTURADO
+     
         prompt = f"""Você é um especialista em análise meteorológica. Analise os seguintes dados climáticos e gere insights úteis.
 
 📊 ESTATÍSTICAS DOS ÚLTIMOS {len(recent_logs)} REGISTROS:
